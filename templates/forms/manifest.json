@@ -1,0 +1,58 @@
+[
+  {
+    "id": "absence",
+    "name": "İşe gelmeme tutanağı",
+    "category": "G",
+    "extension": "docx",
+    "file": "absence.docx"
+  },
+  {
+    "id": "notice",
+    "name": "İşe gelmeme tutanağı ve ihtarı",
+    "category": "G",
+    "extension": "docx",
+    "file": "notice.docx"
+  },
+  {
+    "id": "accident",
+    "name": "İş kazası tutanağı",
+    "category": "GENEL",
+    "extension": "docx",
+    "file": "accident.docx"
+  },
+  {
+    "id": "warning",
+    "name": "Uyarı tutanağı",
+    "category": "GENEL",
+    "extension": "docx",
+    "file": "warning.docx"
+  },
+  {
+    "id": "resignation",
+    "name": "İstifa dilekçesi",
+    "category": "GENEL",
+    "extension": "docx",
+    "file": "resignation.docx"
+  },
+  {
+    "id": "annual",
+    "name": "Yıllık izin formu",
+    "category": "S",
+    "extension": "xlsx",
+    "file": "leave.xlsx"
+  },
+  {
+    "id": "unpaid",
+    "name": "Ücretsiz izin formu",
+    "category": "Ü",
+    "extension": "xlsx",
+    "file": "leave.xlsx"
+  },
+  {
+    "id": "overtime",
+    "name": "Fazla mesai formu",
+    "category": "GENEL",
+    "extension": "xlsx",
+    "file": "overtime.xlsx"
+  }
+]

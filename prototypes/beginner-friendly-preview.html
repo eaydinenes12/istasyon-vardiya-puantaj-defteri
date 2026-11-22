@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18354b">
+  <title>Vardiya Planı ve Puantaj — Kolay Kullanım Önizlemesi</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font: 16px/1.5 "Segoe UI", Arial, sans-serif;
+      color: #1d3445;
+      background: #edf2f5;
+      --navy: #18354b;
+      --navy-dark: #102a3d;
+      --teal: #007d78;
+      --teal-soft: #e6f4f2;
+      --ink: #1d3445;
+      --muted: #526977;
+      --line: #cbd8df;
+      --paper: #fff;
+      --canvas: #edf2f5;
+      --focus: #007d78;
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; margin: 0; background: var(--canvas); }
+    button, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, select:focus-visible, summary:focus-visible {
+      outline: 3px solid #007d78;
+      outline-offset: 3px;
+    }
+    .topbar {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      padding: 0 32px;
+      color: #fff;
+      background: var(--navy);
+      border-bottom: 4px solid #49a79f;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; font-size: 17px; font-weight: 700; white-space: nowrap; }
+    .brand-mark {
+      width: 36px; height: 36px; display: grid; place-items: center;
+      border: 1px solid #87bcb7; color: #d6f1ee; font-size: 12px; letter-spacing: .04em;
+    }
+    nav { display: flex; align-self: stretch; gap: 4px; }
+    .nav-button {
+      position: relative; padding: 0 16px; border: 0; color: #d5e0e6; background: transparent; font-weight: 650;
+    }
+    .nav-button:hover, .nav-button[aria-current="page"] { color: #fff; background: #24465b; }
+    .nav-button[aria-current="page"]::after {
+      position: absolute; right: 12px; bottom: -4px; left: 12px; height: 3px; background: #b7e0dc; content: "";
+    }
+    .demo-badge { margin-left: auto; padding: 5px 10px; border: 1px solid #8da7b5; color: #fff; font-size: 13px; white-space: nowrap; }
+    main { width: min(1440px, 100%); margin: 0 auto; padding: 28px 32px 54px; }
+    .demo-note {
+      display: flex; align-items: flex-start; gap: 10px; padding: 12px 15px;
+      color: #314d5d; background: #e1eaee; border: 1px solid #c1d0d8;
+    }
+    .demo-note strong { color: #18354b; }
+    .page-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 26px 0 18px; }
+    h1 { margin: 0; color: var(--navy-dark); font-size: 28px; line-height: 1.2; letter-spacing: -.025em; }
+    .page-heading p { max-width: 68ch; margin: 7px 0 0; color: var(--muted); }
+    .period-label { padding: 9px 13px; border: 1px solid var(--line); background: #fff; color: var(--navy); font-weight: 700; white-space: nowrap; }
+    .steps {
+      display: grid; grid-template-columns: repeat(3, 1fr); margin: 20px 0 22px;
+      border: 1px solid var(--line); background: var(--paper);
+    }
+    .step { display: flex; align-items: center; gap: 11px; min-height: 62px; padding: 10px 16px; color: var(--muted); }
+    .step + .step { border-left: 1px solid var(--line); }
+    .step-number {
+      flex: 0 0 29px; width: 29px; height: 29px; display: grid; place-items: center;
+      border: 1px solid #9aadb8; color: #314d5d; font-size: 14px; font-weight: 700;
+    }
+    .step.complete .step-number { border-color: var(--teal); color: #fff; background: var(--teal); }
+    .step.current { color: var(--navy-dark); background: #f0f7f6; font-weight: 700; }
+    .step.current .step-number { border: 2px solid var(--teal); color: var(--teal); }
+    .step strong { display: block; color: inherit; font-size: 15px; }
+    .step small { display: block; font-size: 12px; font-weight: 400; }
+    .work-area { display: grid; grid-template-columns: minmax(245px, 290px) minmax(0, 1fr); gap: 20px; align-items: start; }
+    .guide-panel, .work-panel, .archive-panel { background: var(--paper); border: 1px solid var(--line); }
+    .guide-panel { padding: 20px; }
+    h2 { margin: 0; color: var(--navy-dark); font-size: 19px; line-height: 1.3; }
+    h3 { margin: 0; color: var(--navy-dark); font-size: 16px; }
+    .guide-panel p { margin: 10px 0 18px; color: var(--muted); }
+    .staff-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .staff-list li { display: flex; justify-content: space-between; gap: 8px; padding-bottom: 7px; border-bottom: 1px solid #e6ecef; }
+    .staff-list small { color: var(--muted); }
+    .button {
+      min-height: 43px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 8px 14px; border: 1px solid #9eafb9; color: var(--navy); background: #fff; font-weight: 700;
+      text-align: center;
+    }
+    .button:hover { background: #f0f5f7; border-color: var(--navy); }
+    .button-primary { border-color: var(--teal); color: #fff; background: var(--teal); }
+    .button-primary:hover { border-color: #006a66; color: #fff; background: #006a66; }
+    .button-wide { width: 100%; margin-top: 15px; }
+    .tip { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    .tip strong { display: block; margin-bottom: 3px; color: var(--ink); }
+    .work-panel { min-width: 0; }
+    .work-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 19px; border-bottom: 1px solid var(--line); }
+    .work-panel-heading p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .work-count { color: #314d5d; font-size: 13px; text-align: right; }
+    .table-instruction { margin: 16px 18px 10px; padding: 11px 13px; color: #314d5d; background: #f0f5f7; }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { min-width: 112px; padding: 10px 9px; border: 1px solid #d5e0e6; text-align: center; }
+    th { color: #fff; background: var(--navy); font-size: 13px; }
+    th:first-child, td:first-child { position: sticky; left: 0; z-index: 1; min-width: 155px; text-align: left; }
+    th:first-child { z-index: 2; background: var(--navy); }
+    td:first-child { background: #f3f6f8; font-weight: 650; }
+    td select { width: 100%; min-width: 100px; height: 38px; padding: 4px 6px; border: 1px solid #b7c8d1; color: var(--ink); background: #fff; }
+    td select.is-filled { border-color: #a7d2cc; background: #f2faf8; }
+    .empty-note { margin: 10px 18px 2px; color: var(--muted); font-size: 13px; }
+    .panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px 18px 19px; border-top: 1px solid var(--line); margin-top: 16px; }
+    .panel-actions .button-primary { margin-left: auto; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .result { display: none; margin: 0 18px 16px; padding: 12px 14px; border: 1px solid #c7d8df; color: #29495b; background: #edf5f7; }
+    .result.visible { display: block; }
+    .result strong { display: block; color: var(--navy-dark); }
+    .attendance-legend { display: flex; flex-wrap: wrap; gap: 8px 17px; padding: 13px 18px; color: #344f5f; font-size: 13px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+    .swatch { width: 15px; height: 15px; border: 1px solid #bdcbd2; }
+    .weekday { background: #f4f7f8; }
+    .weekend { background: #e9f1fb; }
+    .public-holiday { background: #fff0e4; }
+    .religious-holiday { background: #f2ecfa; }
+    .attendance-table th { min-width: 66px; padding: 8px 5px; }
+    .attendance-table th:first-child { min-width: 150px; }
+    .attendance-table th.weekday { color: #18354b; background: #f4f7f8; }
+    .attendance-table th.weekend { color: #18354b; background: #e9f1fb; }
+    .attendance-table th.public-holiday { color: #613b1d; background: #fff0e4; }
+    .attendance-table th.religious-holiday { color: #473266; background: #f2ecfa; }
+    .attendance-table td { min-width: 55px; }
+    .attendance-table td:first-child { min-width: 150px; }
+    .code { color: #18354b; font-weight: 700; }
+    .archive-panel { padding: 20px; }
+    .archive-panel > p { color: var(--muted); }
+    .archive-table th, .archive-table td { min-width: 0; padding: 12px; text-align: left; }
+    .archive-table td:first-child { position: static; background: #fff; }
+    .status-saved { color: #236a53; font-weight: 700; }
+    .tools {
+      margin-top: 24px; border: 1px solid var(--line); background: #f7f9fa;
+    }
+    .tools summary { padding: 14px 17px; color: var(--navy); font-weight: 700; cursor: pointer; }
+    .tools summary:hover { background: #eef3f6; }
+    .tools-content { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); }
+    .tool-group { padding: 17px; }
+    .tool-group + .tool-group { border-left: 1px solid var(--line); }
+    .tool-group h3 { margin-bottom: 8px; }
+    .tool-group ul { margin: 0; padding-left: 19px; color: #344f5f; }
+    .tool-group li { margin: 5px 0; }
+    .tool-note { padding: 0 17px 16px; margin: 0; color: var(--muted); font-size: 14px; }
+    .toast {
+      position: fixed; right: 24px; bottom: 24px; z-index: 5; max-width: min(470px, calc(100vw - 32px));
+      padding: 14px 18px; border: 1px solid #93b7b2; color: #fff; background: #18354b;
+      box-shadow: 0 5px 18px #18354b33; transform: translateY(12px); opacity: 0; pointer-events: none;
+      transition: opacity .18s ease-out, transform .18s ease-out;
+    }
+    .toast.visible { transform: translateY(0); opacity: 1; }
+    .footer-note { margin-top: 20px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 900px) {
+      .topbar { flex-wrap: wrap; gap: 5px 18px; padding: 12px 18px; }
+      nav { order: 3; width: 100%; min-height: 43px; overflow-x: auto; }
+      .nav-button { min-width: max-content; }
+      .demo-badge { margin-left: auto; }
+      main { padding: 20px 18px 36px; }
+      .work-area { grid-template-columns: 1fr; }
+      .guide-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; }
+      .guide-panel > p { margin: 4px 0; }
+      .staff-list { grid-column: 2; grid-row: 1 / span 4; }
+      .guide-panel .button-wide { width: auto; justify-self: start; margin-top: 4px; }
+      .tip { grid-column: 1 / -1; margin-top: 6px; }
+    }
+    @media (max-width: 600px) {
+      .page-heading { align-items: start; flex-direction: column; }
+      h1 { font-size: 24px; }
+      .steps { grid-template-columns: 1fr; }
+      .step + .step { border-top: 1px solid var(--line); border-left: 0; }
+      .guide-panel { display: block; }
+      .staff-list { margin-top: 14px; }
+      .work-panel-heading { align-items: start; flex-direction: column; }
+      .work-count { text-align: left; }
+      .panel-actions .button-primary { width: 100%; margin-left: 0; }
+      .tools-content { grid-template-columns: 1fr; }
+      .tool-group + .tool-group { border-top: 1px solid var(--line); border-left: 0; }
+      .archive-table { font-size: 13px; }
+      .archive-table th, .archive-table td { padding: 8px 6px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">VP</span> Vardiya Planı &amp; Puantaj</div>
+    <nav aria-label="Ana sayfalar">
+      <button class="nav-button" type="button" data-screen="schedule" aria-current="page">Vardiya planla</button>
+      <button class="nav-button" type="button" data-screen="attendance">Puantajı kontrol et</button>
+      <button class="nav-button" type="button" data-screen="archive">Kayıtlı aylar</button>
+    </nav>
+    <span class="demo-badge">Etkileşimli önizleme</span>
+  </header>
+
+  <main>
+    <div class="demo-note" role="note">
+      <span aria-hidden="true">ⓘ</span>
+      <div><strong>Bu bir deneme ekranıdır.</strong> Örnek isim ve çizelge kullanır; gerçek verilerinize bağlanmaz ve hiçbir şeyi kaydetmez.</div>
+    </div>
+
+    <section class="screen active" id="screen-schedule" aria-labelledby="schedule-title">
+      <div class="page-heading">
+        <div>
+          <h1 id="schedule-title">Bu haftanın vardiyasını planlayın</h1>
+          <p>Önce çalışanların günlerini doldurun. Sonra planı kontrol edip kaydedin. Bir kutuya tıklayarak vardiya seçebilirsiniz.</p>
+        </div>
+        <div class="period-label">26 Ekim – 1 Kasım 2026</div>
+      </div>
+
+      <div class="steps" aria-label="Planlama adımları">
+        <div class="step complete"><span class="step-number" aria-hidden="true">✓</span><div><strong>Personel hazır</strong><small>4 çalışan listede</small></div></div>
+        <div class="step current" id="step-shifts" aria-current="step"><span class="step-number">2</span><div><strong>Vardiyaları girin</strong><small id="progress-label">Henüz 0 gün planlandı</small></div></div>
+        <div class="step" id="step-review"><span class="step-number">3</span><div><strong>Kontrol edip kaydedin</strong><small>Eksikleri görerek ilerleyin</small></div></div>
+      </div>
+
+      <div class="work-area">
+        <aside class="guide-panel" aria-labelledby="people-title">
+          <h2 id="people-title">Personel listesi</h2>
+          <p>Planı yapmak için bu çalışanlardan birini seçin.</p>
+          <ul class="staff-list">
+            <li><span>Ayşe Yılmaz</span><small>MARKET</small></li>
+            <li><span>Mehmet Kaya</span><small>MARKET</small></li>
+            <li><span>Ece Demir</span><small>TEMİZLİK</small></li>
+            <li><span>Ferhat Çelik</span><small>ÖSSE</small></li>
+          </ul>
+          <button class="button button-wide" type="button" data-toast="Üretim uygulamasında bu düğme personel ekleme ekranını açar. Bu önizlemede kayıt değişmez.">+ Personel ekle</button>
+          <div class="tip"><strong>İlk kez mi kullanıyorsunuz?</strong> Bir çalışanın gün kutusuna tıklayın ve listeden çalışma saatini seçin. “H — Hafta tatili” çalışılmayan planlı gündür.</div>
+        </aside>
+
+        <section class="work-panel" aria-labelledby="table-title">
+          <div class="work-panel-heading">
+            <div><h2 id="table-title">Haftalık çizelge</h2><p>Her kutuda bir vardiya veya izin seçin.</p></div>
+            <div class="work-count"><strong id="filled-count">0</strong> / <span id="cell-count">24</span> gün planlandı</div>
+          </div>
+          <p class="table-instruction">Bir kutuya tıklayın. Çalışma saati, hafta tatili veya izin seçeneklerinden birini seçin. <strong>Boş kutu</strong>, o gün için henüz plan girilmediğini gösterir.</p>
+          <div class="table-wrap">
+            <table aria-label="Örnek haftalık vardiya çizelgesi">
+              <thead><tr><th scope="col">Çalışan</th><th scope="col">Pzt<br>26 Eki</th><th scope="col">Sal<br>27 Eki</th><th scope="col">Çar<br>28 Eki</th><th scope="col">Per<br>29 Eki</th><th scope="col">Cum<br>30 Eki</th><th scope="col">Cmt<br>31 Eki</th><th scope="col">Paz<br>1 Kas</th></tr></thead>
+              <tbody>
+                <tr><td>Ayşe Yılmaz</td><td><select aria-label="Ayşe Yılmaz, 26 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ayşe Yılmaz, 27 Ekim"><option value="">Vardiya seçin</option><option selected>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ayşe Yılmaz, 28 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option selected>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ayşe Yılmaz, 29 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option selected>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ayşe Yılmaz, 30 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option selected>S — Yıllık izin</option></select></td><td><select aria-label="Ayşe Yılmaz, 31 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option selected>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ayşe Yılmaz, 1 Kasım"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td></tr>
+                <tr><td>Mehmet Kaya</td><td><select aria-label="Mehmet Kaya, 26 Ekim"><option value="">Vardiya seçin</option><option selected>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Mehmet Kaya, 27 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option selected>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Mehmet Kaya, 28 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Mehmet Kaya, 29 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Mehmet Kaya, 30 Ekim"><option value="">Vardiya seçin</option><option selected>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Mehmet Kaya, 31 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option selected>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Mehmet Kaya, 1 Kasım"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td></tr>
+                <tr><td>Ece Demir</td><td><select aria-label="Ece Demir, 26 Ekim"><option value="">Vardiya seçin</option><option selected>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ece Demir, 27 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ece Demir, 28 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ece Demir, 29 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ece Demir, 30 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ece Demir, 31 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ece Demir, 1 Kasım"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td></tr>
+                <tr><td>Ferhat Çelik</td><td><select aria-label="Ferhat Çelik, 26 Ekim"><option value="">Vardiya seçin</option><option selected>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ferhat Çelik, 27 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option selected>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ferhat Çelik, 28 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ferhat Çelik, 29 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ferhat Çelik, 30 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ferhat Çelik, 31 Ekim"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td><td><select aria-label="Ferhat Çelik, 1 Kasım"><option value="">Vardiya seçin</option><option>08:00–16:00</option><option>16:00–00:00</option><option>00:00–08:00</option><option>H — Hafta tatili</option><option>S — Yıllık izin</option></select></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="empty-note">Tüm hafta günleri tabloda yer alır; dar ekranda görmek için sağa kaydırın. Planlanmamış hücreler kendiliğinden vardiya sayılmaz.</p>
+          <div class="result" id="schedule-result" role="status" aria-live="polite"></div>
+          <div class="panel-actions">
+            <button class="button" type="button" data-screen="attendance">Puantajı gör</button>
+            <button class="button button-primary" type="button" id="check-schedule">Planı kontrol et</button>
+            <button class="button" type="button" id="save-schedule" disabled>Onayla ve kaydet</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-attendance" aria-labelledby="attendance-title">
+      <div class="page-heading">
+        <div><h1 id="attendance-title">Puantajı kolayca kontrol edin</h1><p>Vardiya planından gelen günlük kodlara bakın. Renkler yalnızca takvim gününü anlatır; çalışma ve ücret hesabını değiştirmez.</p></div>
+        <div class="period-label">Ekim 2026</div>
+      </div>
+      <div class="work-panel">
+        <div class="work-panel-heading"><div><h2>Aylık puantaj</h2><p>Örnek görünüm: ayın son günleri</p></div><div class="work-count">Kodlar vardiya planından oluşturulur</div></div>
+        <div class="attendance-legend" aria-label="Takvim renkleri açıklaması">
+          <span class="legend-item"><span class="swatch weekday"></span>Normal iş günü</span>
+          <span class="legend-item"><span class="swatch weekend"></span>Hafta sonu</span>
+          <span class="legend-item"><span class="swatch public-holiday"></span>Resmî tatil</span>
+          <span class="legend-item"><span class="swatch religious-holiday"></span>Dini bayram</span>
+        </div>
+        <div class="table-wrap">
+          <table class="attendance-table" aria-label="Örnek puantaj çizelgesi">
+            <thead><tr><th scope="col">Çalışan</th><th class="weekday" scope="col">26 Pzt</th><th class="weekday" scope="col">27 Sal</th><th class="public-holiday" scope="col">28 Çar</th><th class="public-holiday" scope="col">29 Per</th><th class="weekday" scope="col">30 Cum</th><th class="weekend" scope="col">31 Cmt</th></tr></thead>
+            <tbody>
+              <tr><td>Ayşe Yılmaz</td><td class="code">X</td><td class="code">X</td><td class="code">X</td><td class="code">X</td><td class="code">S</td><td class="code">H</td></tr>
+              <tr><td>Mehmet Kaya</td><td class="code">X</td><td class="code">X</td><td class="code">—</td><td class="code">—</td><td class="code">X</td><td class="code">H</td></tr>
+              <tr><td>Ece Demir</td><td class="code">X</td><td class="code">—</td><td class="code">—</td><td class="code">—</td><td class="code">—</td><td class="code">—</td></tr>
+              <tr><td>Ferhat Çelik</td><td class="code">X</td><td class="code">H</td><td class="code">—</td><td class="code">—</td><td class="code">—</td><td class="code">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="table-instruction">“—” işareti örnek veride o güne ait giriş olmadığını gösterir. Bir hücre elle düzeltilirse uygulama bunu vardiya planından gelen koddan ayrı işaretler.</p>
+        <div class="panel-actions">
+          <button class="button" type="button" data-screen="schedule">Vardiya planına dön</button>
+          <button class="button button-primary" type="button" data-toast="Üretim uygulamasında puantaj Excel çıktısı oluşturulur. Bu önizlemede dosya üretilmez.">Excel çıktısı al</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-archive" aria-labelledby="archive-title">
+      <div class="page-heading">
+        <div><h1 id="archive-title">Kayıtlı çalışmalarınız</h1><p>Daha önce kaydettiğiniz dönemi açabilir, karşılaştırabilir veya güvenli bir yedeği geri yükleyebilirsiniz.</p></div>
+        <div class="period-label">Örnek arşiv</div>
+      </div>
+      <div class="archive-panel">
+        <h2>Kayıtlı aylar</h2>
+        <p>Aşağıdaki örnek satırlar arayüzü göstermek içindir; sizin arşiviniz değildir.</p>
+        <div class="table-wrap">
+          <table class="archive-table">
+            <thead><tr><th scope="col">Dönem</th><th scope="col">Vardiya</th><th scope="col">Puantaj</th><th scope="col">İşlem</th></tr></thead>
+            <tbody>
+              <tr><td>Ekim 2026</td><td class="status-saved">Kaydedildi</td><td class="status-saved">Kaydedildi</td><td><button class="button" type="button" data-toast="Üretim uygulamasında Ekim 2026 seçilen ekrana yüklenir. Bu önizleme kayıt açmaz.">Dönemi aç</button></td></tr>
+              <tr><td>Eylül 2026</td><td class="status-saved">Kaydedildi</td><td class="status-saved">Kaydedildi</td><td><button class="button" type="button" data-toast="Üretim uygulamasında dönem sürümleri karşılaştırılır. Bu önizlemede işlem yapılmaz.">Sürümleri karşılaştır</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel-actions">
+          <button class="button" type="button" data-toast="Üretim uygulamasında yerel yedeklerin listesi açılır.">Yedekleri görüntüle</button>
+          <button class="button button-primary" type="button" data-toast="Üretim uygulamasında yalnızca bu bilgisayarda yedek oluşturulur. Bu önizleme dosya yazmaz.">Şimdi yedekle</button>
+        </div>
+      </div>
+    </section>
+
+    <details class="tools">
+      <summary>Diğer araçlar ve gelişmiş özellikler</summary>
+      <div class="tools-content">
+        <section class="tool-group"><h3>Planlama</h3><ul><li>Toplu vardiya ata, önceki haftayı kopyala veya boşları öner</li><li>Vardiya şablonları, alternatif senaryolar ve renkler</li><li>Kişi uygunluğu, yetkinlik ve saatlik asgari kadro</li><li>İzin talepleri, vardiya takası, dönem onayı ve bölüm yönetimi</li></ul></section>
+        <section class="tool-group"><h3>Personel ve puantaj</h3><ul><li>Personel kartları, çalışma tercihleri, belgeler ve notlar</li><li>Puantaj kodları, elle düzeltme ve vardiya-puantaj karşılaştırması</li><li>PDKS giriş/çıkış karşılaştırması ve dönem kontrolü</li><li>Mesai, tatil günleri, izin bakiyesi ve personel özetleri</li></ul></section>
+        <section class="tool-group"><h3>Tablo, formlar ve dosyalar</h3><ul><li>Excel/Word/PDF'den içe aktar; taranmış belgeleri gözden geçir</li><li>Excel tablo şablonları, biçimlendirme ve satır/sütun düzeni</li><li>Form şablonları, taslaklar ve doldurulmuş form geçmişi</li><li>Excel/PDF dışa aktar, yazdır ve JPEG kaydet</li></ul></section>
+        <section class="tool-group"><h3>Raporlar ve kayıt güvenliği</h3><ul><li>Bordro/SGK aktarımı, aylık-yıllık raporlar ve dönem karşılaştırması</li><li>Arşiv, sürüm geçmişi, dönem kilidi ve kontrollü geri alma</li><li>Yerel yedek oluştur, doğrula ve geri yükle</li><li>Değişiklik geçmişi, kullanıcı yetkileri ve ayarlar</li></ul></section>
+      </div>
+      <p class="tool-note">Gelişmiş özellikler kaldırılmaz; ilk ekranda yalnızca günlük iş için gerekenler görünür. İhtiyacınız olduğunda başlıkları anlaşılır biçimde listelenmiş araçlara buradan ulaşırsınız.</p>
+    </details>
+
+    <p class="footer-note">Bu denemenin amacı: önce yapılacak işi göstermek, her adımı sade dille anlatmak, hataları işlemden önce açıklamak ve uzman araçlarını ihtiyaç duyulana kadar gizlemektir. Özellikler kaldırılmaz; yalnızca bulunmaları ve sunuluş sıraları değişir.</p>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    const navButtons = [...document.querySelectorAll("[data-screen]")];
+    const screens = [...document.querySelectorAll(".screen")];
+    const toast = document.querySelector("#toast");
+    let toastTimer;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("visible"), 3800);
+    }
+
+    function showScreen(name) {
+      screens.forEach((screen) => screen.classList.toggle("active", screen.id === `screen-${name}`));
+      document.querySelectorAll(".nav-button").forEach((button) => {
+        if (button.dataset.screen === name) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.addEventListener("click", (event) => {
+      const screenButton = event.target.closest("[data-screen]");
+      if (screenButton) showScreen(screenButton.dataset.screen);
+      const toastButton = event.target.closest("[data-toast]");
+      if (toastButton) showToast(toastButton.dataset.toast);
+    });
+
+    const shiftSelects = [...document.querySelectorAll("#screen-schedule select")];
+    const progressLabel = document.querySelector("#progress-label");
+    const filledCount = document.querySelector("#filled-count");
+    const saveButton = document.querySelector("#save-schedule");
+    let scheduleReviewed = false;
+
+    function updateProgress() {
+      const filled = shiftSelects.filter((select) => select.value).length;
+      const cells = shiftSelects.length;
+      filledCount.textContent = filled;
+      document.querySelector("#cell-count").textContent = cells;
+      progressLabel.textContent = `${filled} gün planlandı; ${cells - filled} kutu boş`;
+      shiftSelects.forEach((select) => select.classList.toggle("is-filled", Boolean(select.value)));
+      scheduleReviewed = false;
+      saveButton.disabled = true;
+      document.querySelector("#schedule-result").classList.remove("visible");
+      const ready = filled === cells;
+      document.querySelector("#step-shifts").classList.toggle("complete", ready);
+      document.querySelector("#step-review").classList.toggle("current", ready);
+      if (ready) {
+        document.querySelector("#step-shifts").removeAttribute("aria-current");
+        document.querySelector("#step-review").setAttribute("aria-current", "step");
+      } else {
+        document.querySelector("#step-review").removeAttribute("aria-current");
+        document.querySelector("#step-shifts").setAttribute("aria-current", "step");
+      }
+    }
+
+    shiftSelects.forEach((select) => select.addEventListener("change", updateProgress));
+
+    document.querySelector("#check-schedule").addEventListener("click", () => {
+      scheduleReviewed = true;
+      saveButton.disabled = false;
+      const filled = shiftSelects.filter((select) => select.value).length;
+      const missing = shiftSelects.length - filled;
+      const result = document.querySelector("#schedule-result");
+      result.classList.add("visible");
+      result.innerHTML = missing
+        ? `<strong>Kontrol tamamlandı: ${missing} kutu boş.</strong> Boş günleri doldurabilir veya planı bu haliyle kaydedebilirsiniz. Bu örnek ekranda gerçek kayıt yapılmaz.`
+        : "<strong>Kontrol tamamlandı: bu örnek tabloda boş kutu yok.</strong> Gerçek uygulamada kaydetmeden önce uyarılar ve dönem bilgileri ayrıca gösterilir.";
+      result.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      document.querySelector("#step-review").classList.add("current");
+      document.querySelector("#step-review").setAttribute("aria-current", "step");
+    });
+
+    saveButton.addEventListener("click", () => {
+      if (!scheduleReviewed) return;
+      showToast("Bu önizlemede kayıt yapılmadı. Gerçek uygulamada seçili haftanın vardiya kayıtları veritabanına kaydedilir.");
+    });
+
+    updateProgress();
+  </script>
+</body>
+</html>

@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18354b">
+  <title>Vardiya Planı ve Puantaj</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="app-loader" class="app-loader" role="status" aria-live="polite">
+    <div class="app-loader-card">
+      <span class="brand-mark" aria-hidden="true">VP</span>
+      <strong>Vardiya Planı &amp; Puantaj</strong>
+      <span class="app-loader-bar" aria-hidden="true"><span></span></span>
+      <small>Veriler yükleniyor…</small>
+    </div>
+  </div>
+  <script>
+    try {
+      const prefs = JSON.parse(localStorage.getItem("vp-appearance") || "{}");
+      if (["light", "dark", "forest", "ocean", "warm", "slate", "plum", "rose", "graphite", "terracotta", "mint", "midnight"].includes(prefs.theme)) {
+        document.documentElement.dataset.theme = prefs.theme;
+      }
+      if (["teal", "blue", "green", "orange", "purple", "red"].includes(prefs.accent)) {
+        document.documentElement.dataset.accent = prefs.accent;
+      }
+      if (prefs.theme === "dark") document.documentElement.classList.add("theme-dark");
+      if (prefs.palette === "contrast") document.documentElement.classList.add("contrast-high");
+      if (prefs.palette === "colorblind") document.documentElement.classList.add("palette-cb");
+      if (prefs.size) document.documentElement.dataset.fontSize = prefs.size;
+    } catch (error) { /* görünüm tercihi okunamadı */ }
+  </script>
+  <!--
+  THESIS: Vardiya verisi bir kez girilir; aynı kayıt okunaklı puantaj kodlarına dönüşür. Kartlı dashboard düzeni yerine çizelgeyi öne alır.
+  OWN-WORLD: Excel yeşili çalışma şeridi, hızlı vardiya paleti ve kaynak çalışma kitaplarının gerçek hücre renkleri/ölçüleri.
+  STORY: Kullanıcı ay ve çalışma sayfasını seçer, vardiya boyacısı veya hücre düzenlemesiyle giriş yapar, puantajı denetler ve Excel çıktısını indirir.
+  FIRST VIEWPORT: Üstte Excel tarzı ürün şeridi ve ekran geçişleri; altında personel/ay kumandaları, hızlı vardiya paleti ve kaynak şablonun çizelgesi.
+  FORM: Operate; masaüstü-first, gerçek veri hücrelerinde yoğun tablo formu. Görsel tohum aracı Node bulunmadığı için kullanılamadı.
+  -->
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Vardiya Planı ve Puantaj ana sayfa">
+        <span class="brand-mark" aria-hidden="true">VP</span>
+        <span class="brand-name">Vardiya Planı <span>&</span> Puantaj</span>
+      </a>
+      <nav class="main-nav" aria-label="Uygulama bölümleri">
+        <button class="nav-tab active" data-view="schedule" type="button">Vardiya</button>
+        <button class="nav-tab" data-view="attendance" type="button">Puantaj</button>
+        <button class="nav-tab" data-view="archive" type="button">Arşiv</button>
+        <button class="nav-tab" data-view="templates" type="button">Tablo şablonları</button>
+        <button class="topbar-assistant" id="open-live-assistant" type="button" aria-haspopup="dialog">Canlı asistan</button>
+      </nav>
+      <button class="topbar-help" id="open-guide" type="button" aria-label="Başlangıç rehberini aç" aria-haspopup="dialog" title="Başlangıç rehberi">?</button>
+      <div class="topbar-meta" id="save-state" aria-live="polite">
+        <span class="status-dot"></span><span id="save-state-label">Bu bilgisayarda kayıtlı</span>
+      </div>
+    </header>
+
+    <main>
+      <section id="archive-view" class="view" aria-labelledby="archive-title">
+        <div class="control-strip"></div>
+        <div class="archive-content">
+          <h1 id="archive-title">Kayıtlı aylar</h1>
+          <p>Bu bilgisayarda kaydedilen vardiya ve puantaj düzeltmeleri. Açıp düzenleyebilir, seçili personel/dönem için Excel'e aktarabilir veya ayrı ayrı silebilirsiniz.</p>
+          <p>Puantaj vardiyalardan hesaplanır; vardiya silinirse puantaj da değişir. Personel, biçimlendirme ve dışa aktarılan dosyalar burada silinmez.</p>
+          <div class="archive-tabs" role="group" aria-label="Arşiv türü">
+            <button class="button button-primary" type="button" data-archive-kind="schedule" aria-pressed="true">Vardiya arşivi</button>
+            <button class="button button-outline" type="button" data-archive-kind="attendance" aria-pressed="false">Puantaj arşivi</button>
+            <button class="button button-light" data-output-kind="archive" type="button">Yazdır / JPEG</button>
+          </div>
+          <div class="archive-filters" aria-label="Arşiv filtreleri">
+            <label>Ay<input id="archive-filter-month" type="month"></label>
+            <label>Personel<input id="archive-filter-person" type="search" maxlength="80" placeholder="Ad soyad"></label>
+            <label>Bölüm<input id="archive-filter-section" type="search" maxlength="80" placeholder="Bölüm adı"></label>
+            <label>Kod / tür<input id="archive-filter-type" type="search" maxlength="80" placeholder="X, izin, çalışma…"></label>
+            <button id="apply-archive-filter" class="button button-outline" type="button">Filtrele</button>
+            <button id="clear-archive-filter" class="button button-light" type="button">Temizle</button>
+            <span id="archive-filter-status" aria-live="polite"></span>
+          </div>
+          <div id="archive-list" aria-live="polite"></div>
+          <section class="backup-manager" aria-labelledby="backup-title">
+            <div class="backup-heading">
+              <h2 id="backup-title">Yedekler</h2>
+              <button id="create-backup" class="button button-outline" type="button">Şimdi yedekle</button>
+            </div>
+            <p>Her gün ilk veri değişikliğinden önce otomatik yedek alınır. Geri yüklemeden önce mevcut veriler de ayrıca yedeklenir.</p>
+            <form class="user-name-form backup-retention-form" id="backup-retention-form">
+              <label for="backup-keep-input">Saklanacak otomatik yedek sayısı</label>
+              <input id="backup-keep-input" type="number" min="0" max="3650" step="1" inputmode="numeric" aria-describedby="backup-keep-help">
+              <button class="button button-outline" type="submit">Kaydet</button>
+              <small id="backup-keep-help">0 = sınırsız. En az 7. Yalnız en eski otomatik yedekler silinir; elle alınan ve geri yükleme öncesi yedeklere dokunulmaz.</small>
+            </form>
+            <div id="backup-list" aria-live="polite"></div>
+          </section>
+          <section class="backup-manager" aria-labelledby="history-title">
+            <div class="backup-heading">
+              <h2 id="history-title">Değişiklik geçmişi</h2>
+              <form id="user-name-form" class="user-name-form">
+                <label for="user-name-input">Kaydı yapan</label>
+                <input id="user-name-input" type="text" maxlength="60" placeholder="Yerel kullanıcı" autocomplete="name">
+                <button class="button button-outline" type="submit">Adı kaydet</button>
+              </form>
+            </div>
+            <p>Bu bilgisayarda yapılan son veri ve ayar değişiklikleri. Bilgisayarı birden fazla kişi kullanıyorsa adınızı girin; sonraki değişiklikler bu adla kaydedilir.</p>
+            <div id="history-list" aria-live="polite"></div>
+          </section>
+        </div>
+      </section>
+      <section id="templates-view" class="view" aria-labelledby="templates-title">
+        <div class="control-strip"></div>
+        <div class="archive-content template-settings">
+          <h1 id="templates-title">Tablo şablonları</h1>
+          <p>Vardiya ve puantaj tablolarının tüm aylarda kullanılan şablonunu buradan yönetin. Değişiklikler kayıtlı vardiya ve puantaj verilerini değiştirmez; yalnızca tabloların görünümünü ve Excel çıktısını etkiler.</p>
+          <div class="template-cards">
+            <article class="template-card" data-template-kind="schedule" aria-labelledby="template-schedule-title">
+              <header>
+                <h2 id="template-schedule-title">Vardiya listesi</h2>
+                <span class="template-badge" data-template-badge>Özgün şablon</span>
+              </header>
+              <p class="template-meta" data-template-meta></p>
+              <h3>1 · Tabloda biçimlendir</h3>
+              <p>Renk, yazı, hizalama, satır/sütun ölçüleri ve alt notları tablonun üzerinde düzenleyin. Kendi biçimi olmayan tüm ay ve haftalar bu şablonu kullanır.</p>
+              <div class="template-actions">
+                <button class="button button-primary" type="button" data-template-edit>Şablonu tabloda düzenle</button>
+                <button class="button button-light" type="button" data-template-layer-reset>Şablon biçimini temizle</button>
+              </div>
+              <p class="template-meta" data-template-layer></p>
+              <div class="template-actions">
+                <button class="button button-light" type="button" data-template-pages-reset>Tüm sayfaları şablona döndür</button>
+              </div>
+              <h3>2 · Excel dosyasıyla değiştir</h3>
+              <p>Şablonu indirip Excel'de başlık, yazı tipi, kenarlık ve renkleri değiştirin, sonra geri yükleyin. Sayfa sayısı, satır/sütun sayısı ve birleştirilmiş hücreler aynı kalmalıdır.</p>
+              <div class="template-actions">
+                <button class="button button-outline" type="button" data-template-download>Excel şablonunu indir</button>
+                <label class="button button-outline template-upload">Düzenlenmiş şablonu yükle<input type="file" accept=".xlsx" data-template-upload></label>
+                <button class="button button-light" type="button" data-template-file-reset>Özgün dosyaya dön</button>
+              </div>
+            </article>
+            <article class="template-card" data-template-kind="attendance" aria-labelledby="template-attendance-title">
+              <header>
+                <h2 id="template-attendance-title">Puantaj listesi</h2>
+                <span class="template-badge" data-template-badge>Özgün şablon</span>
+              </header>
+              <p class="template-meta" data-template-meta></p>
+              <h3>1 · Tabloda biçimlendir</h3>
+              <p>Renk, yazı, hizalama, satır/sütun ölçüleri ve alt notları tablonun üzerinde düzenleyin. Kendi biçimi olmayan tüm aylar bu şablonu kullanır.</p>
+              <div class="template-actions">
+                <button class="button button-primary" type="button" data-template-edit>Şablonu tabloda düzenle</button>
+                <button class="button button-light" type="button" data-template-layer-reset>Şablon biçimini temizle</button>
+              </div>
+              <p class="template-meta" data-template-layer></p>
+              <div class="template-actions">
+                <button class="button button-light" type="button" data-template-pages-reset>Tüm sayfaları şablona döndür</button>
+              </div>
+              <h3>2 · Excel dosyasıyla değiştir</h3>
+              <p>Şablonu indirip Excel'de başlık, yazı tipi, kenarlık ve renkleri değiştirin, sonra geri yükleyin. Sayfa sayısı, satır/sütun sayısı ve birleştirilmiş hücreler aynı kalmalıdır.</p>
+              <div class="template-actions">
+                <button class="button button-outline" type="button" data-template-download>Excel şablonunu indir</button>
+                <label class="button button-outline template-upload">Düzenlenmiş şablonu yükle<input type="file" accept=".xlsx" data-template-upload></label>
+                <button class="button button-light" type="button" data-template-file-reset>Özgün dosyaya dön</button>
+              </div>
+            </article>
+          </div>
+          <p class="template-note">Excel dosyasındaki personel, vardiya saati ve puantaj kodu hücreleri dışa aktarımda uygulama verisiyle doldurulur. Yerleşimi bozacak değişiklikler (satır/sütun ekleme-silme, birleştirme değişikliği) yüklemede reddedilir.</p>
+        </div>
+      </section>
+      <section id="schedule-view" class="view active" aria-labelledby="schedule-title">
+        <h1 id="schedule-title" class="sr-only">Vardiya Listesi</h1>
+        <div class="control-strip">
+          <details class="period-panel">
+            <summary id="schedule-period-label">Ay / hafta</summary>
+            <div class="period-controls">
+          <label class="month-control"><span>Ay</span><input id="schedule-month" type="month"></label>
+          <div class="week-control" aria-label="Hafta seçimi">
+            <span class="control-label">Hafta</span>
+            <button class="icon-button" id="previous-week" type="button" aria-label="Önceki hafta" title="Önceki hafta">‹</button>
+            <select id="schedule-week" aria-label="Vardiya haftası"></select>
+            <button class="icon-button" id="next-week" type="button" aria-label="Sonraki hafta" title="Sonraki hafta">›</button>
+            <button class="button button-light" id="copy-previous-week" type="button" title="Önceki haftanın kayıtlarını bu haftaya kopyala" disabled>Önceki haftayı kopyala</button>
+            <button class="button button-light" id="copy-previous-month" type="button" title="Önceki ayın düzenini 4 haftalık döngüyle boş hücrelere kopyala">Önceki aydan doldur</button>
+            <button class="button button-light" id="suggest-week" type="button" title="Bu haftanın boş hücrelerini önceki haftalara göre doldur">Boşları öner</button>
+          </div>
+            </div>
+          </details>
+          <div class="control-spacer"></div>
+          <span id="schedule-count" class="quiet-label"></span>
+          <button class="button button-primary" id="save-schedule" title="Değişiklikleri kaydet" type="button" disabled>Kaydet</button>
+          <button class="icon-button" id="undo-schedule" type="button" aria-label="Vardiya değişikliğini geri al" title="Geri al" disabled>↶</button>
+          <button class="icon-button" id="redo-schedule" type="button" aria-label="Vardiya değişikliğini yinele" title="Yinele" disabled>↷</button>
+          <span class="history-action-description" id="schedule-history-action" role="status" aria-live="polite"></span>
+          <button class="button button-light" id="open-schedule-check" type="button" aria-haspopup="dialog">Dönem kontrolü</button>
+          <button class="button button-outline" id="export-schedule" type="button">
+            <span class="button-icon" aria-hidden="true">↓</span> Excel indir
+          </button>
+          <button class="button button-light" data-output-kind="schedule" type="button">Yazdır / JPEG</button>
+          <button class="button button-light" id="open-import" type="button" aria-haspopup="dialog">İçe aktar</button>
+          <button class="button button-light" id="undo-import" type="button" title="Son içe aktarmayı, başka bir çizelge değişikliği yapana kadar geri al" hidden>Son içe aktarmayı geri al</button>
+        </div>
+        <p class="export-location" id="schedule-export-location" aria-live="polite"></p>
+
+        <details class="person-panel">
+          <summary title="Personel işlemleri">Personel <span>İsim ekle, toplu ekle veya pasife al</span></summary>
+        <div class="person-toolbar">
+          <div class="person-list-actions">
+            <button class="button button-outline" id="open-bulk-person-dialog" type="button" aria-haspopup="dialog">
+              İsim listesini toplu ekle
+            </button>
+            <label class="sr-only" for="extra-personnel-section">Ek satır bölümü</label>
+            <select id="extra-personnel-section" class="extra-personnel-section">
+              <option value="MARKET">MARKET</option>
+              <option value="TEMİZLİK">TEMİZLİK</option>
+              <option value="ÖSSE">ÖSSE</option>
+            </select>
+            <button class="button button-light" id="open-extra-personnel" type="button" title="Seçilen bölümün son satırının altına boş personel satırı açar. Boş bırakılan ek satırlar Excel çıktısına eklenmez. Kalıcı satır sayısı için Araçlar › Bölümler ve satırlar.">Ek personel satırı ekle</button>
+            <span class="person-list-hint">Boş çizelge satırlarından kayıtlı personeli seçin.</span>
+          </div>
+          <form id="add-person-form" class="add-person-form">
+            <label class="field-label" for="new-person-name">Tek personel ekle</label>
+            <input id="new-person-name" name="name" type="text" maxlength="80" placeholder="Ad soyad" required>
+            <button class="button button-dark" type="submit">Listeye ekle</button>
+          </form>
+          <div class="add-existing">
+            <label class="field-label" for="existing-person">Personel işlemleri</label>
+            <select id="existing-person"><option value="">Personel seçin</option></select>
+            <button class="button button-light" id="deactivate-person" type="button">Pasife al</button>
+            <button class="button button-light" id="activate-person" type="button" hidden>Aktif et</button>
+            <button class="button button-light danger-button" id="delete-person" type="button" title="Personeli kalıcı olarak siler">Sil</button>
+          </div>
+        </div>
+        </details>
+
+        <details class="quick-panel">
+        <summary title="Hızlı giriş ve hafta özeti">Hızlı giriş</summary>
+        <div class="quick-panel-content">
+        <div class="formula-bar" id="shift-palette" aria-label="Hızlı vardiya ve günlük durum seçimi">
+          <div class="palette-heading">
+            <span class="formula-label">Hızlı giriş</span>
+            <span class="palette-hint">Bir seçeneği hücreye sürükleyin veya hücreye tıklayıp seçim penceresini açın.</span>
+            <button class="button button-light quick-entry-settings-trigger" id="open-quick-entry-settings" type="button" aria-haspopup="dialog">
+              Hızlı giriş ayarları
+            </button>
+          </div>
+          <div class="palette-options" id="quick-entry-options" aria-label="Hızlı giriş seçenekleri"></div>
+          <div class="palette-actions">
+            <button class="shift-chip clear-chip" type="button" data-action="clear-brush">Hücreyi temizle</button>
+            <button class="shift-chip free-edit-chip active" type="button" data-free-edit="true">Hücreyi düzenle</button>
+            <button class="button button-outline" id="open-bulk-schedule-dialog" type="button" aria-haspopup="dialog">Toplu vardiya ata</button>
+          </div>
+          <div class="schedule-template-tools" aria-label="Vardiya şablonları">
+            <form id="schedule-template-form">
+              <label for="schedule-template-name">Seçili haftayı şablon olarak kaydet</label>
+              <div class="schedule-template-actions">
+                <input id="schedule-template-name" type="text" maxlength="60" placeholder="Örn. Normal hafta" required>
+                <button class="button button-outline" id="save-schedule-template" type="submit">Şablon kaydet</button>
+              </div>
+            </form>
+            <div class="schedule-template-select-group">
+              <label for="schedule-template-select">Kayıtlı şablon</label>
+              <div class="schedule-template-actions">
+                <select id="schedule-template-select"><option value="">Şablon seçin</option></select>
+                <button class="button button-light" id="apply-schedule-template" type="button" disabled>Seçili haftaya uygula</button>
+                <button class="button button-light danger-button" id="delete-schedule-template" type="button" disabled>Sil</button>
+              </div>
+            </div>
+            <p id="schedule-template-status" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="ops-summary schedule-summary" id="schedule-summary" aria-label="Seçilen hafta özeti"></div>
+        <div class="schedule-staffing" id="schedule-staffing" hidden></div>
+        </div>
+        </details>
+        <div class="schedule-filters" aria-label="Vardiya satırı arama, filtre ve sıralama">
+          <label for="schedule-search">Personel ara<input id="schedule-search" type="search" placeholder="Ad soyad"></label>
+          <label for="schedule-section-filter">Bölüm
+            <select id="schedule-section-filter"><option value="">Tüm bölümler</option><option>MARKET</option><option>TEMİZLİK</option><option>ÖSSE</option></select>
+          </label>
+          <label for="schedule-kind-filter">Vardiya / durum
+            <select id="schedule-kind-filter">
+              <option value="">Tüm vardiyalar</option><option value="work">Çalışma</option>
+              <option value="weekly_off">Hafta tatili</option><option value="overnight_exit">Geceden çıkış</option>
+              <option value="annual_leave">Senelik izin</option><option value="sick_leave">Rapor</option>
+              <option value="unpaid_leave">Ücretsiz izin</option><option value="absent">İşe gelmedi</option>
+              <option value="other">Diğer durumlar</option><option value="missing">Eksik vardiya / durum</option>
+            </select>
+          </label>
+          <label for="schedule-sort">Sıralama
+            <select id="schedule-sort"><option value="slot">Şablon sırası</option><option value="name">Personel A-Z</option></select>
+          </label>
+          <label for="schedule-min-rest-hours">Asgari dinlenme (saat)
+            <input id="schedule-min-rest-hours" type="number" min="0" max="24" step="0.5" value="0" aria-describedby="schedule-rest-help">
+            <small id="schedule-rest-help">0 saat: yalnızca çakışma denetlenir.</small>
+          </label>
+          <label class="compact-toggle" for="schedule-hide-empty" title="Boş personel satırları gizlenir; her bölümde yalnızca ekleme için bir boş satır kalır. Ad seçtikçe yeni satır kendiliğinden açılır.">
+            <input id="schedule-hide-empty" type="checkbox"> Boş satırları gizle
+          </label>
+          <button class="button button-light" id="clear-schedule-filters" type="button">Filtreleri temizle</button>
+          <span id="schedule-filter-count" role="status" aria-live="polite"></span>
+          <span id="schedule-validation-status" role="status" aria-live="polite"></span>
+        </div>
+        <details class="schedule-comparison-panel" id="schedule-comparison-panel">
+          <summary>İki personelin haftasını yan yana karşılaştır</summary>
+          <div class="schedule-comparison-controls">
+            <label for="schedule-compare-first">Birinci personel
+              <select id="schedule-compare-first"></select>
+            </label>
+            <label for="schedule-compare-second">İkinci personel
+              <select id="schedule-compare-second"></select>
+            </label>
+            <button class="button button-outline" id="schedule-compare-run" type="button">Karşılaştır</button>
+            <span id="schedule-compare-status" role="status" aria-live="polite"></span>
+          </div>
+          <div class="schedule-comparison-tables" id="schedule-comparison-tables" hidden></div>
+        </details>
+        <div id="schedule-empty" class="empty-filter" role="status" aria-live="polite" hidden></div>
+        <div id="schedule-period-check-flow" class="period-check-followup" role="status" aria-live="polite" hidden>
+          <span data-period-check-position></span>
+          <button class="button button-light" type="button" data-period-check-step="-1">Önceki eksik</button>
+          <button class="button button-outline" type="button" data-period-check-step="1">Sonraki eksik</button>
+          <button class="button button-light" type="button" data-period-check-close>Akışı bitir</button>
+        </div>
+        <div class="table-frame schedule-frame">
+          <table class="workbook-table schedule-workbook" id="schedule-table"></table>
+        </div>
+        <div class="sheet-tab-strip" id="schedule-sheet-tabs" role="tablist" aria-label="Vardiya haftaları">
+        </div>
+        <div class="workbook-status">
+          <span id="schedule-sheet-name"></span>
+          <span>Görünüm ölçeği: %55</span>
+          <span class="workbook-status-spacer"></span>
+          <span>Hücreye tıklayın, hızlı giriş seçin veya sürükleyin</span>
+        </div>
+        <div class="table-footer">
+          <div class="legend">
+            <span class="legend-title">Vardiya türü</span>
+            <span>Çalışma saati · H Hafta tatili · G.Ç Geceden çıkış · S Senelik izin · R Rapor · Ü Ücretsiz izin</span>
+          </div>
+        </div>
+        <div class="table-footer schedule-footer">
+          <p>Kaydetmeden ekran veya ay değiştirirseniz son düzenlemeler kaybolur.</p>
+        </div>
+        <div id="schedule-validation-warnings" class="schedule-validation-warnings" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <section id="attendance-view" class="view" aria-labelledby="attendance-title">
+        <h1 id="attendance-title" class="sr-only">Puantaj Listesi</h1>
+        <div class="control-strip attendance-controls">
+          <details class="period-panel">
+            <summary id="attendance-period-label">Ay seçimi</summary>
+          <div class="period-controls"><label class="month-control"><span>Ay</span><input id="attendance-month" type="month"></label></div>
+          </details>
+          <div class="sync-note"><span class="sync-icon" aria-hidden="true">↻</span><span>Vardiya listesiyle eşitlenir</span></div>
+          <div class="control-spacer"></div>
+          <span id="attendance-count" class="quiet-label"></span>
+          <button class="button button-primary" id="save-attendance" title="Puantajı kaydet" type="button" disabled>Kaydet</button>
+          <button class="icon-button" id="undo-attendance" type="button" aria-label="Puantaj değişikliğini geri al" title="Geri al" disabled>↶</button>
+          <button class="icon-button" id="redo-attendance" type="button" aria-label="Puantaj değişikliğini yinele" title="Yinele" disabled>↷</button>
+          <span class="history-action-description" id="attendance-history-action" role="status" aria-live="polite"></span>
+          <button class="button button-light" id="open-attendance-roster" type="button" aria-haspopup="dialog" title="Puantajda görünecek personeli düzenle">Puantaj personeli</button>
+          <button class="button button-light" id="open-attendance-check" type="button" aria-haspopup="dialog">Dönem kontrolü</button>
+          <button class="button button-light" id="open-reports" type="button" aria-haspopup="dialog">Raporlar</button>
+          <button class="button button-light" id="open-month-close" type="button" aria-haspopup="dialog">Ay sonu kapanışı</button>
+          <button class="button button-outline" id="export-attendance" type="button">
+            <span class="button-icon" aria-hidden="true">↓</span> Excel indir
+          </button>
+          <button class="button button-light" data-output-kind="attendance" type="button">Yazdır / JPEG</button>
+          <button class="button button-light" id="open-attendance-events" type="button">İzin / devamsızlık kayıtları</button>
+          <button class="button button-light" id="open-forms" type="button">Formlar</button>
+          <button class="button button-light" id="open-document-center" type="button">Tutanak arşivi</button>
+          <button class="button button-light" id="open-form-settings" type="button">Form ayarları</button>
+        </div>
+        <p class="export-location" id="attendance-export-location" aria-live="polite"></p>
+        <details class="quick-panel">
+          <summary>Aylık özet</summary>
+          <div class="quick-panel-content">
+          <section class="overtime-rule" aria-labelledby="overtime-rule-title">
+            <h2 id="overtime-rule-title">Fazla mesai kuralı</h2>
+            <p>Günlük sınırı aşan çalışma fazla mesai (FM) sayılır ve vardiyanın başladığı güne yazılır; resmî tatil saatleri ayrı sütunda tutulur. Günlük sınır 0 ise haftalık sınır kullanılır. Puantajdaki FM kutusuna yazarak elle düzeltebilir, kutuyu boşaltarak otomatik hesaba dönebilirsiniz.</p>
+            <div class="overtime-rule-controls">
+              <label for="overtime-daily-limit">Günlük normal saat
+                <input id="overtime-daily-limit" type="number" min="0" max="24" step="0.25" value="8">
+              </label>
+              <label for="overtime-weekly-limit">Haftalık normal saat sınırı
+                <input id="overtime-weekly-limit" type="number" min="0" max="168" step="0.25" value="0">
+              </label>
+              <label for="overtime-week-start">Çalışma haftası başlangıcı
+                <select id="overtime-week-start">
+                  <option value="0">Pazartesi</option><option value="1">Salı</option>
+                  <option value="2">Çarşamba</option><option value="3">Perşembe</option>
+                  <option value="4">Cuma</option><option value="5">Cumartesi</option>
+                  <option value="6">Pazar</option>
+                </select>
+              </label>
+              <label for="overtime-break-rules" title="Örnek: 4=30; 7,5=60 → 4 saati aşan günde 30 dk, 7,5 saati aşan günde 60 dk mola düşülür. Boş bırakılırsa mola düşülmez.">Mola düşümü (saat=dakika)
+                <input id="overtime-break-rules" type="text" maxlength="80" placeholder="Kapalı · örn. 4=30; 7,5=60">
+              </label>
+              <label>Yürürlük ayı <input id="overtime-effective-month" type="month"></label>
+              <button class="button button-outline" id="save-overtime-settings" type="button">Geçişi önizle</button>
+            </div>
+            <p class="overtime-rule-hint">FM hücresine çift tıklayarak kişinin gün gün hesap dökümünü ve iki aya yayılan vardiyalarının dakika dağılımını görün.</p>
+          </section>
+          <div class="ops-summary attendance-summary" id="attendance-summary" aria-label="Aylık puantaj özeti"></div>
+          <div id="attendance-person-report" class="attendance-person-report"></div>
+          <section class="attendance-balances" aria-labelledby="attendance-balances-title">
+            <h2 id="attendance-balances-title">Yıl içi personel takip bakiyeleri</h2>
+            <p class="attendance-balance-note">Açılış izin günleri ve saatleri işyeri tarafından girilir. Kullanım, seçili yılın ocak ayından seçili döneme kadar kaydedilmiş puantaj kodları ve mevcut fazla mesai kuralına göre özetlenir; yasal hak, ücret veya ödenecek tutar hesabı değildir.</p>
+            <p id="balance-status" class="attendance-balance-status" aria-live="polite"></p>
+            <div id="attendance-balance-report" class="attendance-person-table-wrap"></div>
+          </section>
+          <section class="attendance-comparison" aria-labelledby="attendance-comparison-title">
+            <h2 id="attendance-comparison-title">Dönem karşılaştırması</h2>
+            <div class="attendance-comparison-controls">
+              <label class="month-control"><span>Karşılaştırılacak ay</span><input id="attendance-compare-month" type="month"></label>
+              <button class="button button-outline" id="compare-attendance-months" type="button">Karşılaştır</button>
+            </div>
+            <p class="attendance-comparison-note">Puantaj kodları ve kayıtlı saat toplamları karşılaştırılır; ücret ve fazla mesai primi hesaplanmaz.</p>
+            <div id="attendance-comparison-result" aria-live="polite"></div>
+          </section>
+          </div>
+        </details>
+        <details class="filter-panel"><summary>Personel ara / filtrele</summary>
+        <div class="attendance-toolbar">
+          <label class="attendance-search">
+            <span class="sr-only">Personel ara</span>
+            <input id="attendance-search" type="search" placeholder="Personel ara…" autocomplete="off">
+          </label>
+          <label class="attendance-filter-label" for="attendance-filter">Görünüm</label>
+          <select id="attendance-filter" aria-label="Puantaj satırlarını filtrele">
+            <option value="all">Tüm personel</option>
+            <option value="events">İzin ve özel kodu olanlar</option>
+            <option value="manual">Elle düzeltilenler</option>
+            <option value="conflicts">Çakışması olanlar</option>
+            <option value="mismatches">Vardiya planından farklı</option>
+          </select>
+          <span id="attendance-filter-count" class="filter-count"></span>
+        </div>
+        </details>
+        <div id="attendance-empty" class="empty-filter" role="status" aria-live="polite" hidden></div>
+        <div id="attendance-period-check-flow" class="period-check-followup" role="status" aria-live="polite" hidden>
+          <span data-period-check-position></span>
+          <button class="button button-light" type="button" data-period-check-step="-1">Önceki eksik</button>
+          <button class="button button-outline" type="button" data-period-check-step="1">Sonraki eksik</button>
+          <button class="button button-light" type="button" data-period-check-close>Akışı bitir</button>
+        </div>
+        <div class="table-frame attendance-frame">
+          <table class="workbook-table attendance-workbook" id="attendance-table"></table>
+        </div>
+        <div class="sheet-tab-strip attendance-sheet-tabs" id="attendance-sheet-tabs" role="tablist" aria-label="Puantaj çalışma sayfası">
+          <button class="sheet-tab" id="attendance-sheet-name" type="button" role="tab" aria-selected="true">PUANTAJ EKİM 2026</button>
+        </div>
+        <div class="workbook-status">
+          <span id="attendance-workbook-name">PUANTAJ EKİM 2026</span>
+          <span>Görünüm ölçeği: %100</span>
+          <span class="workbook-status-spacer"></span>
+          <span>Kodları veya kesinti tutarını hücrede düzenleyin</span>
+        </div>
+        <div class="table-footer attendance-footer">
+          <div class="legend">
+            <span class="legend-title">Kodlar</span>
+            <span><b>X</b> Çalışma</span><span><b>H</b> Hafta tatili</span><span><b>G.Ç</b> Geceden çıkış</span>
+            <span><b>S</b> Senelik izin</span><span><b>R</b> Rapor</span><span><b>Ü</b> Ücretsiz izin</span>
+            <span><b>G</b> İşe gelmedi</span><span><b>İST.</b> İstifa</span><span><b>E</b> Evlilik izni</span>
+            <span><b>K</b> Karantina</span><span><b>Y</b> Yarım gün</span>
+          </div>
+          <p>Kodları elle düzeltebilir, Excel’deki KESİNTİ sütununa TL tutarı girebilirsiniz. Kesinti ve ücretler otomatik hesaplanmaz.</p>
+        </div>
+        <div class="table-footer attendance-calendar-footer">
+          <div class="legend calendar-legend" aria-label="Takvim günü renk açıklaması">
+            <span class="legend-title">Gün türü</span>
+            <span><i class="calendar-mark calendar-weekday"></i>İş günü</span>
+            <span><i class="calendar-mark calendar-weekend"></i>Hafta sonu</span>
+            <span><i class="calendar-mark calendar-official"></i>Resmî tatil</span>
+            <span><i class="calendar-mark calendar-religious"></i>Dini bayram</span>
+          </div>
+        </div>
+        <div id="attendance-warnings" class="warning-list" role="status" aria-live="polite" hidden></div>
+        <div id="leave-alerts" class="leave-alerts" role="status" hidden></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <div id="print-sheet" hidden><div id="print-pages"></div></div>
+  <dialog class="quick-entry-dialog" id="archive-revision-dialog" aria-labelledby="archive-revision-title">
+    <div class="dialog-heading">
+      <div><h2 id="archive-revision-title">Arşiv sürümleri</h2><p id="archive-revision-status" role="status" aria-live="polite"></p></div>
+      <button class="icon-button dialog-close" id="close-archive-revisions" type="button" aria-label="Kapat">×</button>
+    </div>
+    <label for="archive-revision-select">Önceki kayıt</label>
+    <select id="archive-revision-select"></select>
+    <pre id="archive-revision-diff" class="form-preview"></pre>
+    <fieldset id="archive-cell-restore" hidden>
+      <legend>Yalnız bir vardiya gününü geri al</legend>
+      <label for="archive-cell-restore-select">Kayıtlı değer → eski değer</label>
+      <select id="archive-cell-restore-select"></select>
+      <button class="button button-outline" id="restore-archive-cell" type="button">Seçili günü geri al</button>
+    </fieldset>
+    <div class="dialog-footer">
+      <button class="button button-outline" id="restore-archive-revision" type="button" disabled>Bu sürümü geri yükle</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog" id="output-dialog" aria-labelledby="output-title">
+    <div class="dialog-heading">
+      <div><h2 id="output-title">Tablo çıktısı</h2><p>Görünen tabloyu veya hücre aralığını yazdırın ya da JPEG kaydedin.</p></div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="output-dialog" aria-label="Kapat">×</button>
+    </div>
+    <div class="forms-fields">
+      <label>İlk hücre <input id="output-start" type="text" autocomplete="off" placeholder="A1"></label>
+      <label>Son hücre <input id="output-end" type="text" autocomplete="off" placeholder="V30"></label>
+      <label id="output-scope-field" hidden>Personel kapsamı
+        <select id="output-scope"></select>
+      </label>
+    </div>
+    <p class="dialog-help">Aralığı Excel hücre adresleriyle belirtin. Vardiya çıktısında personel kapsamı filtrelerden bağımsız seçilir; seçili hücre aralığı her iki kapsam için de geçerlidir. Birleşik hücreler aralık sınırında kesilebilir.</p>
+    <p id="output-message" role="status" aria-live="polite"></p>
+    <div id="output-preview" class="output-preview" aria-live="polite" hidden></div>
+    <div class="dialog-footer">
+      <button class="button button-light" id="output-preview-button" type="button">Sayfa kırılımlarını önizle</button>
+      <button class="button button-outline" id="output-jpeg" type="button">JPEG kaydet</button>
+      <button class="button button-outline" id="output-whatsapp" type="button" title="Görüntüyü panoya kopyalar ve WhatsApp'ı açar; sohbette Ctrl+V ile yapıştırın">WhatsApp'a gönder</button>
+      <button class="button button-primary" id="output-print" type="button">Yazdır</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog reports-dialog" id="reports-dialog" aria-labelledby="reports-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="reports-title">Raporlar</h2>
+        <p id="reports-subtitle"></p>
+      </div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="reports-dialog" aria-label="Kapat">×</button>
+    </div>
+    <p id="reports-dirty-note" class="reports-note reports-warning" hidden>Kaydedilmemiş puantaj düzeltmeleri var. Raporlar kaydedilmiş verilerden hazırlanır; önce kaydedin.</p>
+    <section class="report-block" aria-labelledby="payroll-report-title">
+      <h3 id="payroll-report-title">Bordro aktarımı</h3>
+      <p class="reports-note">Personel başına çalışılan gün, H, S, R, Ü, G ve diğer kod sayıları, normal/tatil saatleri, fazla mesai ve kesinti tutarı. Ücret hesaplanmaz.</p>
+      <div class="report-actions">
+        <button class="button button-outline" type="button" data-report-payroll="xlsx">Excel (.xlsx) kaydet</button>
+        <button class="button button-light" type="button" data-report-payroll="csv">CSV kaydet</button>
+      </div>
+    </section>
+    <section class="report-block" aria-labelledby="person-report-title">
+      <h3 id="person-report-title">Personel aylık özeti (PDF)</h3>
+      <p class="reports-note">Takvim görünümünde günlük kodlar, gün dağılımı, saatler, yıllık izin bakiyesi ve imza alanları. Tüm personel seçilirse her kişi ayrı sayfadır.</p>
+      <div class="report-actions">
+        <label class="report-person"><span>Personel</span><select id="report-person"></select></label>
+        <button class="button button-primary" type="button" id="report-person-pdf">PDF kaydet</button>
+      </div>
+    </section>
+    <section class="report-block" aria-labelledby="yearly-report-title">
+      <h3 id="yearly-report-title">Yıllık puantaj özeti (Excel)</h3>
+      <p class="reports-note">Ocak–Aralık arası kaydedilmiş puantajlardan kişi başına yıllık kod toplamları, saatler ve aylık X / S / R / fazla mesai dağılımı.</p>
+      <div class="report-actions">
+        <label class="report-person"><span>Yıl</span><input id="report-year" type="number" min="2000" max="2100" step="1"></label>
+        <button class="button button-outline" type="button" id="report-yearly">Excel (.xlsx) kaydet</button>
+      </div>
+    </section>
+    <div class="dialog-actions">
+      <button class="button button-light" type="button" data-close-dialog="reports-dialog">Kapat</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog month-close-dialog" id="month-close-dialog" aria-labelledby="month-close-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="month-close-title">Ay sonu kapanışı</h2>
+        <p id="month-close-subtitle"></p>
+      </div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="month-close-dialog" aria-label="Kapat">×</button>
+    </div>
+    <p id="month-close-dirty" class="reports-note reports-warning" hidden>Kaydedilmemiş puantaj değişikliği var. Kapanıştan önce puantajı kaydedin.</p>
+    <ol class="month-close-steps">
+      <li data-close-step="check">
+        <div><strong>1. Kontrol</strong><span data-step-status>Boş gün, dinlenme ve izin uyarılarını gözden geçirin.</span></div>
+        <button class="button button-outline" type="button" data-close-action="check">Kontrolü çalıştır</button>
+      </li>
+      <li data-close-step="backup">
+        <div><strong>2. Yedek</strong><span data-step-status>Kilitlemeden önce tüm verilerin doğrulanmış yedeği alınır.</span></div>
+        <button class="button button-outline" type="button" data-close-action="backup">Yedek al</button>
+      </li>
+      <li data-close-step="lock">
+        <div><strong>3. Dönemi kilitle</strong><span data-step-status>Kilitli ayın vardiya ve puantajı yanlışlıkla değiştirilemez; Arşiv'den açılabilir.</span></div>
+        <button class="button button-outline" type="button" data-close-action="lock">Kilitle</button>
+      </li>
+      <li data-close-step="export">
+        <div><strong>4. Çıktı</strong><span data-step-status>Puantaj Excel'i ve bordro aktarım dosyasını kaydedin.</span></div>
+        <div class="report-actions">
+          <button class="button button-outline" type="button" data-close-action="export">Puantaj Excel</button>
+          <button class="button button-light" type="button" data-close-action="payroll">Bordro Excel</button>
+        </div>
+      </li>
+    </ol>
+    <div class="dialog-actions">
+      <button class="button button-light" type="button" data-close-dialog="month-close-dialog">Kapat</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog period-check-dialog" id="period-check-dialog" aria-labelledby="period-check-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="period-check-title">Dönem kontrolü</h2>
+        <p id="period-check-subtitle"></p>
+      </div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="period-check-dialog" aria-label="Kapat">×</button>
+    </div>
+    <div id="period-check-summary" class="period-check-summary" role="status" aria-live="polite"></div>
+    <div id="period-check-content" class="period-check-content"></div>
+    <div class="dialog-actions">
+      <button class="button button-light" type="button" data-close-dialog="period-check-dialog">Kapat</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog attendance-roster-dialog" id="attendance-roster-dialog" aria-labelledby="attendance-roster-title">
+    <div class="dialog-heading">
+      <div><h2 id="attendance-roster-title">Puantaj personeli</h2><p id="attendance-roster-period"></p></div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="attendance-roster-dialog" aria-label="Kapat">×</button>
+    </div>
+    <p class="dialog-help">Vardiya listesindeki personel puantaja kendiliğinden gelir. Müdür, tanker şoförü gibi vardiya dışı çalışanları buradan ekleyebilir, sırayı değiştirebilirsiniz. Vardiyada yer alan kişi listeden çıkarılamaz.</p>
+    <div class="roster-add">
+      <label>Personel ekle <select id="attendance-roster-add"></select></label>
+      <button class="button button-light" id="attendance-roster-add-button" type="button">Ekle</button>
+      <button class="button button-light" id="attendance-roster-add-all" type="button" title="Listede olmayan tüm aktif personeli ekle">Eksiklerin tümünü ekle</button>
+      <button class="button button-light" id="attendance-roster-call" type="button" title="Çıkarılan vardiya personelini geri getir ve sırayı sıfırla">Vardiyadaki personeli çağır</button>
+    </div>
+    <ol id="attendance-roster-list" class="roster-list" aria-live="polite"></ol>
+    <div class="dialog-actions">
+      <button class="button button-light" type="button" data-close-dialog="attendance-roster-dialog">Vazgeç</button>
+      <button class="button button-primary" id="attendance-roster-save" type="button">Uygula ve kaydet</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog attendance-events-dialog" id="attendance-events-dialog" aria-labelledby="attendance-events-title">
+    <div class="dialog-heading">
+      <div><h2 id="attendance-events-title">İzin ve devamsızlık kayıtları</h2><p id="attendance-events-period"></p></div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="attendance-events-dialog" aria-label="Kapat">×</button>
+    </div>
+    <form id="attendance-event-form" class="forms-fields">
+      <label>Personel <select id="attendance-event-person" required></select></label>
+      <label>Kayıt türü
+        <select id="attendance-event-kind" required>
+          <option value="annual_leave">Yıllık izin</option><option value="sick_leave">Rapor</option>
+          <option value="unpaid_leave">Ücretsiz izin</option><option value="absence">İşe gelmeme</option>
+          <option value="marriage_leave">Evlilik izni</option><option value="other">Diğer</option>
+        </select>
+      </label>
+      <label>Başlangıç <input id="attendance-event-start" type="date" required></label>
+      <label>Bitiş <input id="attendance-event-end" type="date" required></label>
+      <label>Belge adı / numarası <input id="attendance-event-document" type="text" maxlength="160"></label>
+      <label>Açıklama <input id="attendance-event-notes" type="text" maxlength="1000"></label>
+      <div class="forms-wide dialog-footer"><button class="button button-primary" type="submit">Kaydı ekle</button></div>
+    </form>
+    <p class="dialog-help">Kayıtlar seçilen puantaj ayına denk gelen tarih aralıklarıyla listelenir. Bu kayıtlar puantaj kodlarını, izin bakiyesini veya ücreti kendiliğinden değiştirmez.</p>
+    <div id="attendance-events-list" aria-live="polite"></div>
+    <div class="dialog-actions"><button class="button button-light" type="button" data-close-dialog="attendance-events-dialog">Kapat</button></div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog guide-dialog" id="guide-dialog" aria-labelledby="guide-title">
+    <div class="dialog-heading">
+      <div><h2 id="guide-title">Başlangıç rehberi</h2><p>Vardiyadan puantaja temel çalışma sırası.</p></div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="guide-dialog" aria-label="Kapat">×</button>
+    </div>
+    <ol class="guide-steps">
+      <li><strong>Personel ekleyin.</strong> Vardiya ekranındaki Personel bölümünden tek tek veya toplu listeyle çalışanları ekleyin.</li>
+      <li><strong>Vardiyayı planlayın.</strong> Boş satırda personeli seçin; güne tıklayıp saatli vardiya, haftalık izin veya uygun durumu işleyin. Gerekirse toplu atama ve haftalık şablonu kullanın.</li>
+      <li><strong>Kaydedip denetleyin.</strong> Vardiya Listesi'nde Kaydet'e basın. Dönem kontrolü olası eksikleri ve çakışmaları gösterir; boş günlerin planlı olup olmadığını siz doğrulayın.</li>
+      <li><strong>Puantajı inceleyin.</strong> Puantaj sekmesine geçin, plan kodlarını ve manuel düzeltme uyarılarını kontrol edin; değişiklik yaptıysanız ayrıca Kaydet'e basın.</li>
+      <li><strong>Çıktı alın.</strong> Excel indir, Yazdır / JPEG ve Arşiv seçeneklerini kullanın. Puantajdaki Raporlar düğmesiyle bordro aktarımı (Excel/CSV) ve personel PDF özeti alın. Ücret, kesinti ve fazla mesai kurallarını kurumunuzun tanımlı esaslarına göre ayrıca doğrulayın.</li>
+    </ol>
+    <h3 class="guide-shortcuts-title">Klavye kısayolları</h3>
+    <ul class="guide-shortcuts">
+      <li><kbd>Ctrl</kbd>+<kbd>S</kbd> Kaydet · <kbd>Ctrl</kbd>+<kbd>Z</kbd> Geri al · <kbd>Ctrl</kbd>+<kbd>Y</kbd> Yinele</li>
+      <li>Vardiya hücresinde: <kbd>Ctrl</kbd>+<kbd>C</kbd> kopyala · <kbd>Ctrl</kbd>+<kbd>V</kbd> yapıştır · <kbd>Delete</kbd> temizle · <kbd>Enter</kbd> hızlı giriş · ok tuşlarıyla gezinme</li>
+    </ul>
+    <div class="dialog-actions"><button class="button button-primary" type="button" data-close-dialog="guide-dialog">Anladım</button></div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog" id="forms-dialog" aria-labelledby="forms-title">
+    <div class="dialog-heading">
+      <div><h2 id="forms-title">Form hazırla</h2><p>Personeli ve tek gün veya tarih aralığını seçin.</p></div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="forms-dialog" aria-label="Kapat">×</button>
+    </div>
+    <div class="forms-fields">
+      <label>Personel <select id="form-person"></select></label>
+      <label>Durum <select id="form-category"><option value="G">İşe gelmedi · G</option><option value="S">Yıllık izin · S</option><option value="Ü">Ücretsiz izin · Ü</option></select></label>
+      <label>Başlangıç <input id="form-start" type="date"></label>
+      <label>Bitiş <input id="form-end" type="date"></label>
+      <label>Bölüm <input id="form-section" maxlength="80" placeholder="Gerekliyse doldurun"></label>
+      <label class="forms-wide">Açıklama <textarea id="form-description" maxlength="500" rows="2" placeholder="Şablonda kullanılıyorsa zorunludur"></textarea></label>
+      <label class="forms-wide">Şablon <select id="form-template"></select></label>
+    </div>
+    <p class="dialog-help">Görsel önizleme şablon düzenini yaklaşık olarak gösterir; son sayfa düzenini Word veya Excel'de kontrol edin. İzin gün sayısı ve işe başlama tarihi otomatik hesaplanmaz.</p>
+    <p id="form-preview-status" role="status" aria-live="polite"></p>
+    <iframe id="form-preview-frame" class="form-preview-frame" title="Form şablonunun görsel önizlemesi"
+      sandbox="allow-same-origin allow-modals"></iframe>
+    <details class="form-text-preview"><summary>Metin dökümünü göster</summary><pre id="form-preview" class="form-preview"></pre></details>
+    <p id="form-save-location" role="status"></p>
+    <div class="dialog-footer">
+      <button class="button button-light" id="form-edit-code" type="button" hidden>Kodu düzenle</button>
+      <button class="button button-outline" id="form-print" type="button" disabled>Önizlemeyi yazdır</button>
+      <div class="form-draft-actions">
+        <button class="button button-light" id="form-save-draft" type="button">Taslağı kaydet</button>
+        <button class="button button-light" id="form-load-draft" type="button">Son taslağı yükle</button>
+      </div>
+      <button class="button button-primary" id="form-save" type="button">Formu kaydet</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog" id="form-settings-dialog" aria-labelledby="form-settings-title">
+    <div class="dialog-heading">
+      <div><h2 id="form-settings-title">Form ayarları</h2><p>Yeni şablon ekleyin veya mevcut şablonu güncelleyin.</p></div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="form-settings-dialog" aria-label="Kapat">×</button>
+    </div>
+    <p class="dialog-help">Word (.docx) veya Excel (.xlsx), en fazla 5 MB. Değişkenler: <code>{{personel}}</code>, <code>{{bolum}}</code>, <code>{{aciklama}}</code>, <code>{{baslangic}}</code>, <code>{{bitis}}</code>, <code>{{aralik}}</code>, <code>{{donem}}</code>, <code>{{tarih}}</code>, <code>{{durum}}</code>. Şablon bölüm/açıklama alanlarını kullanıyorsa formda bu bilgileri girin. Word'de metin, tablo, üst ve alt bilgiler; Excel'de metin hücreleri desteklenir. Değişken olmayan alanları çıktı dosyasında elle doldurun.</p>
+    <div id="form-settings-list"></div>
+    <form id="form-settings-form">
+      <input id="form-settings-id" type="hidden">
+      <div class="forms-fields">
+        <label>Form adı <input id="form-settings-name" maxlength="100" required></label>
+        <label>Durum <select id="form-settings-category"><option value="G">İşe gelmedi · G</option><option value="S">Yıllık izin · S</option><option value="Ü">Ücretsiz izin · Ü</option><option value="GENEL">Genel</option></select></label>
+        <label class="forms-wide">Şablon dosyası <input id="form-settings-file" type="file" accept=".docx,.xlsx" required></label>
+      </div>
+      <div class="dialog-footer"><button class="button button-light" id="form-settings-reset" type="button">Yeni form</button><button class="button button-primary" type="submit">Şablonu kaydet</button></div>
+    </form>
+  </dialog>
+  <dialog class="quick-entry-dialog import-dialog" id="import-dialog" aria-labelledby="import-title">
+    <div class="dialog-heading">
+      <div><h2 id="import-title">Vardiya içe aktar</h2><p>Excel (.xlsx), Word (.docx) veya PDF seçin. Taranmış PDF'ler bilgisayarda okunur. Kayıtlar önce önizlenir; otomatik kaydedilmez.</p></div>
+      <button class="icon-button dialog-close" id="close-import" type="button" aria-label="Kapat">×</button>
+    </div>
+    <p class="dialog-help">Tablo başlıkları: Personel, Bölüm, Tarih ve Durum veya Giriş / Çıkış. Excel vardiya şablonu da desteklenir. Personel uygulamada kayıtlı olmalıdır.</p>
+    <input id="import-file" type="file" accept=".xlsx,.docx,.pdf">
+    <button class="button button-outline" id="open-import-mapping" type="button" disabled>Düzeni elle eşleştir / metni düzelt</button>
+    <p id="import-message" role="status" aria-live="polite"></p>
+    <section id="import-ocr-evidence" class="import-ocr-evidence" aria-label="OCR görüntü kanıtı" hidden>
+      <h3>Belge görüntüsüyle OCR doğrulaması</h3>
+      <p>Her tanınan satır özgün görüntü bölgesiyle gösterilir. OCR motoru alan bazlı güven puanı vermediğinden aktarım öncesinde metni görüntüyle karşılaştırın.</p>
+      <div id="import-ocr-evidence-rows"></div>
+    </section>
+    <div id="import-mapping" class="import-mapping" hidden>
+      <p>Taranan metinde eksik veya hatalı satırlar olabilir. Belgeyle karşılaştırıp düzeltin; sütunları <strong>|</strong> işareti ayırır. Satır ve sütun numaraları 1'den başlar. Sadece seçili aya ait kayıtlar aktarılır.</p>
+      <label>Sayfa / tablo <select id="import-table"></select></label>
+      <label><input id="import-force-ocr" type="checkbox"> PDF sayfalarını görüntü olarak yeniden oku</label>
+      <button class="button button-light" id="import-reread" type="button">Dosyayı yeniden oku</button>
+      <label for="import-source">Okunan metin (düzenlenebilir)</label>
+      <textarea id="import-source" rows="9" spellcheck="false"></textarea>
+      <section id="import-source-context" class="import-source-context" aria-label="Kaynak satırı karşılaştırması" hidden>
+        <h3>Kaynak satırı karşılaştırması</h3>
+        <p>Özgün satır, dosya ve konum bilgisi korunur. Buradaki düzeltmeler yalnızca okunan metni etkiler; kaynak dosya değiştirilmez.</p>
+        <div id="import-source-context-rows"></div>
+      </section>
+      <div class="import-profile-controls">
+        <label>Kaydedilmiş eşleştirme profili <select id="import-profile-select"><option value="">Profil seçin</option></select></label>
+        <label>Profil adı <input id="import-profile-name" type="text" maxlength="80" placeholder="Örn. Aylık vardiya tablosu"></label>
+        <button class="button button-outline" id="save-import-profile" type="button">Profili kaydet / güncelle</button>
+        <button class="button button-light" id="delete-import-profile" type="button" disabled>Seçili profili sil</button>
+      </div>
+      <section id="import-profile-header-warning" class="import-profile-header-warning" role="status" hidden>
+        <p id="import-profile-header-warning-text"></p>
+        <label><input id="import-profile-header-confirm" type="checkbox"> Yeni belge başlıklarını ve eşleştirmeyi kontrol ettim; devam et</label>
+      </section>
+      <div class="import-mapping-fields">
+        <label>Düzen <select id="map-mode"><option value="rows">Her satır bir personel / gün</option><option value="matrix">Her satır personel, sütunlar tarihler</option></select></label>
+        <label>İlk veri satırı <input id="map-start-row" type="number" min="1" max="5000" value="2"></label>
+        <label>Personel sütunu <input id="map-person-col" type="number" min="1" max="80" value="1"></label>
+        <label>Bölüm sütunu <input id="map-section-col" type="number" min="1" max="80" placeholder="Yoksa boş"></label>
+        <label>Varsayılan bölüm <select id="map-default-section"><option value="">Seçin</option><option>MARKET</option><option>TEMİZLİK</option><option>ÖSSE</option></select></label>
+        <span class="map-rows-field"><label>Tarih sütunu <input id="map-date-col" type="number" min="1" max="80"></label></span>
+        <span class="map-rows-field"><label>Durum / vardiya sütunu <input id="map-status-col" type="number" min="1" max="80" placeholder="İsteğe bağlı"></label></span>
+        <span class="map-rows-field"><label>Giriş sütunu <input id="map-start-col" type="number" min="1" max="80" placeholder="İsteğe bağlı"></label></span>
+        <span class="map-rows-field"><label>Çıkış sütunu <input id="map-end-col" type="number" min="1" max="80" placeholder="İsteğe bağlı"></label></span>
+        <span class="map-matrix-field" hidden><label>Tarih başlığı satırı <input id="map-header-row" type="number" min="1" max="5000" value="1"></label></span>
+        <span class="map-matrix-field" hidden><label>İlk tarih sütunu <input id="map-first-day-col" type="number" min="1" max="80" value="2"></label></span>
+      </div>
+      <button class="button button-outline" id="preview-import-mapping" type="button">Eşleştirmeyi önizle</button>
+    </div>
+    <div id="import-scope-controls" class="import-scope-controls" hidden>
+      <label>Aktarım kapsamı
+        <select id="import-scope">
+          <option value="all">Tüm kayıtlar</option>
+          <option value="hours">Yalnız çalışma saatleri</option>
+          <option value="codes">Seçili vardiya / durum kodları</option>
+        </select>
+      </label>
+      <div id="import-code-options" class="import-code-options" role="group" aria-label="Aktarılacak vardiya ve durum kodları" hidden></div>
+      <p class="dialog-help">Kapsamı her değiştirdiğinizde önizlemeyi yeniden oluşturun. Çizelgeye aktarım ayrıca onaylanır ve otomatik kaydedilmez.</p>
+      <button class="button button-outline" id="preview-import-scope" type="button" disabled>Seçilen kapsamı önizle</button>
+    </div>
+    <div class="import-preview" id="import-preview"></div>
+    <button class="button button-light" data-output-kind="import" type="button" disabled>Önizlemeyi yazdır / JPEG</button>
+    <div class="dialog-footer"><button class="button button-primary" id="apply-import" type="button" disabled>Uygun kayıtları çizelgeye aktar</button></div>
+  </dialog>
+  <dialog class="quick-entry-dialog" id="cell-quick-entry-dialog" aria-labelledby="cell-quick-entry-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="cell-quick-entry-title">Günlük giriş seçin</h2>
+        <p id="cell-quick-entry-date"></p>
+      </div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="cell-quick-entry-dialog" aria-label="Pencereyi kapat">×</button>
+    </div>
+    <div class="dialog-entry-list" id="cell-quick-entry-options"></div>
+    <div class="dialog-footer clipboard-footer">
+      <div class="clipboard-actions">
+        <button class="button button-outline" id="copy-schedule-day" type="button" disabled>Günü kopyala</button>
+        <button class="button button-light" id="paste-schedule-day" type="button" disabled>Günü yapıştır</button>
+        <button class="button button-outline" id="copy-schedule-week" type="button" disabled>Haftayı kopyala</button>
+        <button class="button button-light" id="paste-schedule-week" type="button" disabled>Haftayı yapıştır</button>
+      </div>
+      <button class="button button-light" type="button" id="protect-schedule-day" hidden></button>
+      <button class="button button-light" type="button" data-close-dialog="cell-quick-entry-dialog">Vazgeç</button>
+    </div>
+  </dialog>
+  <dialog class="quick-entry-dialog forms-dialog" id="bulk-schedule-dialog" aria-labelledby="bulk-schedule-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="bulk-schedule-title">Toplu vardiya ata</h2>
+        <p>Seçili ay içinde birden fazla personel ve güne aynı hızlı girişi uygulayın.</p>
+      </div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="bulk-schedule-dialog" aria-label="Kapat">×</button>
+    </div>
+    <form id="bulk-schedule-form">
+      <div class="bulk-schedule-fields">
+        <label>Bölüm
+          <select id="bulk-schedule-section">
+            <option>MARKET</option><option>TEMİZLİK</option><option>ÖSSE</option>
+          </select>
+        </label>
+        <label>Başlangıç tarihi <input id="bulk-schedule-start" type="date" required></label>
+        <label>Bitiş tarihi <input id="bulk-schedule-end" type="date" required></label>
+        <label>Vardiya / durum
+          <select id="bulk-schedule-entry" required></select>
+        </label>
+      </div>
+      <div class="bulk-employee-heading">
+        <strong>Personeller</strong>
+        <button class="button button-light" id="bulk-schedule-select-all" type="button">Tümünü seç</button>
+      </div>
+      <div class="bulk-employee-list" id="bulk-schedule-people" aria-label="Toplu atama personelleri"></div>
+      <div id="bulk-schedule-preview" class="bulk-schedule-preview" role="status" aria-live="polite"></div>
+      <p class="dialog-help">Seçili aralıktaki mevcut girişler değiştirilecekse uygulama önce onay ister. Aralık, ekrandaki ayla sınırlıdır.</p>
+      <div class="dialog-actions">
+        <button class="button button-primary" type="submit">Seçilenlere uygula</button>
+        <button class="button button-light" type="button" data-close-dialog="bulk-schedule-dialog">Vazgeç</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog class="quick-entry-dialog people-dialog" id="bulk-person-dialog" aria-labelledby="bulk-person-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="bulk-person-title">Personel listesini toplu ekle</h2>
+        <p>Her satıra bir ad-soyad yazın. Yinelenen veya geçersiz adlar eklenmez.</p>
+      </div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="bulk-person-dialog" aria-label="Pencereyi kapat">×</button>
+    </div>
+    <form id="bulk-person-form">
+      <label class="dialog-field" for="bulk-person-names">Personel adları
+        <textarea id="bulk-person-names" rows="10" maxlength="9000" placeholder="Ayşe Yılmaz&#10;Mehmet Demir&#10;..." required></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button class="button button-primary" type="submit">İsimleri ekle</button>
+        <button class="button button-light" type="button" data-close-dialog="bulk-person-dialog">Vazgeç</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog class="quick-entry-dialog settings-dialog" id="quick-entry-settings-dialog" aria-labelledby="quick-entry-settings-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="quick-entry-settings-title">Hızlı giriş ayarları</h2>
+        <p>Her seçeneğe puantaj kodu, isteğe bağlı giriş ve çıkış saati tanımlayın.</p>
+      </div>
+      <button class="icon-button dialog-close" type="button" data-close-dialog="quick-entry-settings-dialog" aria-label="Pencereyi kapat">×</button>
+    </div>
+    <form id="quick-entry-form">
+      <input id="quick-entry-id" type="hidden">
+      <label class="dialog-field" for="quick-entry-label">Hızlı giriş adı
+        <input id="quick-entry-label" type="text" maxlength="40" placeholder="Örn. Eğitim vardiyası" required>
+      </label>
+      <label class="dialog-field" for="quick-entry-code">Puantaj kısa kodu
+        <input id="quick-entry-code" type="text" maxlength="8" placeholder="X, H, S…" required>
+      </label>
+      <div class="dialog-time-fields">
+        <label class="dialog-field" for="quick-entry-start">Giriş saati
+          <input id="quick-entry-start" type="text" inputmode="numeric" maxlength="5" placeholder="07:00" autocomplete="off">
+        </label>
+        <label class="dialog-field" for="quick-entry-end">Çıkış saati
+          <input id="quick-entry-end" type="text" inputmode="numeric" maxlength="5" placeholder="24:00" autocomplete="off">
+        </label>
+      </div>
+      <label class="dialog-field" for="quick-entry-shift-type">Vardiya türü
+        <select id="quick-entry-shift-type"></select>
+      </label>
+      <p class="quick-entry-type-preview" id="quick-entry-type-preview" aria-live="polite"></p>
+      <p class="dialog-help">Saatleri 0700, 7, 7:30 veya gece yarısı için 24:00 olarak yazabilirsiniz. Saatleri boş bırakırsanız seçenek yalnızca puantaj kodu işler. 8 saati aşan süre fazla mesai olarak hesaplanır.</p>
+      <p class="dialog-help" id="quick-entry-preset-hint" hidden>Hazır izin/durum girişlerinde yalnızca ad ve tür değiştirilebilir; puantaj kodu sabittir.</p>
+      <div class="dialog-actions">
+        <button class="button button-primary" id="save-quick-entry" type="submit">Hızlı girişi ekle</button>
+        <button class="button button-light" id="reset-quick-entry-form" type="button">Temizle</button>
+      </div>
+    </form>
+    <div class="custom-entry-section">
+      <h3>Hızlı giriş renkleri</h3>
+      <p class="dialog-help">Renk seçimi sonraki hücre girişlerine uygulanır; mevcut vardiyalar değişmez.</p>
+      <div id="quick-entry-color-list" class="preset-color-list"></div>
+      <h3>Tüm hızlı girişler</h3>
+      <p class="dialog-help">Hazır girişleri düzenleyebilir, gizleyebilir veya varsayılana döndürebilirsiniz.</p>
+      <div class="custom-entry-list" id="custom-quick-entry-list"></div>
+    </div>
+    <div class="dialog-footer">
+      <button class="button button-light" type="button" data-close-dialog="quick-entry-settings-dialog">Kapat</button>
+    </div>
+  </dialog>
+  <dialog id="live-assistant-dialog" class="live-assistant-dialog" aria-labelledby="live-assistant-title">
+    <section class="live-assistant">
+      <header class="live-assistant-header">
+        <div>
+          <h2 id="live-assistant-title">Canlı asistan</h2>
+          <p>Soruları yanıtlar, bölüm açar ve onayınızla tekil vardiya/puantaj kaydı yapar.</p>
+        </div>
+        <button class="icon-button" id="close-live-assistant" type="button" aria-label="Asistanı kapat">×</button>
+      </header>
+      <div class="live-assistant-model">
+        <label for="live-assistant-model">Bu bilgisayardaki yapay zekâ modeli</label>
+        <select id="live-assistant-model" aria-describedby="live-assistant-status"></select>
+        <button class="button button-outline" id="refresh-live-assistant-models" type="button">Modelleri yenile</button>
+        <span id="live-assistant-status" role="status" aria-live="polite"></span>
+      </div>
+      <p class="live-assistant-privacy">Sohbet ve uygulama bağlamı yalnızca bu bilgisayardaki Ollama modeline gönderilir; sohbet geçmişi kaydedilmez. Değişiklik önerilerinde personel adı, tarih ve kod/tür doğrulanır; siz onaylamadan hiçbir kayıt yapılmaz. Mikrofon kullanımı tarayıcının konuşma tanıma hizmetini açabilir ve cihaz ayarlarına göre çevrimiçi işlenebilir.</p>
+      <div id="live-assistant-transcript" class="live-assistant-transcript" role="log" aria-live="polite" aria-relevant="additions">
+        <p class="live-assistant-empty">Örneğin “Puantajı aç” veya “Ayşe Yılmaz için 20 Kasım 2026’da işe gelmedi kodu öner” yazın. Değişiklikler siz onaylamadan kaydedilmez.</p>
+      </div>
+      <section id="live-assistant-pending" class="live-assistant-pending" hidden aria-live="polite">
+        <p id="live-assistant-action-summary"></p>
+        <div class="live-assistant-action-buttons">
+          <button class="button button-primary" id="confirm-live-assistant-action" type="button">Onayla ve uygula</button>
+          <button class="button button-light" id="cancel-live-assistant-action" type="button">İptal</button>
+        </div>
+      </section>
+      <form id="live-assistant-form" class="live-assistant-form">
+        <label class="sr-only" for="live-assistant-input">Asistana mesaj yaz</label>
+        <textarea id="live-assistant-input" rows="2" maxlength="4000" placeholder="Ne yapmak istersiniz?" required></textarea>
+        <div class="live-assistant-compose-actions">
+          <button class="button button-outline" id="live-assistant-mic" type="button" aria-label="Sesle yaz">Sesle yaz</button>
+          <button class="button button-primary" id="live-assistant-send" type="submit">Gönder</button>
+        </div>
+      </form>
+      <details class="live-assistant-privacy">
+        <summary>Modele gönderilecek bilgiler</summary>
+        <p id="live-assistant-context"></p>
+        <p>Mesajınız ve son sohbet iletileri de gönderilir. Önceki iletileri çıkarmak için Yeni sohbet’i seçin.
+          Belge içerikleri, ücretler ve personel kartları otomatik eklenmez.</p>
+      </details>
+      <footer class="live-assistant-footer">
+        <label><input id="live-assistant-speak" type="checkbox"> Yanıtları sesli oku</label>
+        <button class="button button-light" id="clear-live-assistant" type="button">Yeni sohbet</button>
+      </footer>
+    </section>
+  </dialog>
+  <script src="/app.js" defer></script>
+  <script src="/live-assistant.js" defer></script>
+  <script src="/format-tools.js" defer></script>
+  <script src="/extras.js" defer></script>
+  <script src="/easy-usability.js" defer></script>
+  <script src="/access.js" defer></script>
+  <script src="/access-services.js" defer></script>
+  <script src="/features.js" defer></script>
+  <script src="/table-tools.js" defer></script>
+  <script src="/sheet-tools.js" defer></script>
+    <script src="/alerts.js" defer></script>
+  <script src="/output.js" defer></script>
+    <script src="/payroll.js" defer></script>
+    <script src="/insights.js" defer></script>
+    <script src="/workspace.js" defer></script>
+  <script src="/controls.js" defer></script>
+  <script src="/grid.js" defer></script>
+</body>
+</html>
